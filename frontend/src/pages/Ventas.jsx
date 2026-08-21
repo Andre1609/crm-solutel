@@ -15,7 +15,7 @@ export default function Ventas() {
   const [nuevoCliente, setNuevoCliente] = useState({ nombres: '', apellidos: '', nacionalidad: '', fecha_nacimiento: '', edad: '', telefono_fijo: '', telefono_movil: '', correo_electronico: '', entidad_bancaria: '', numero_cuenta: '' });
   const buscarCliente = async () => {
     if (!dni) return; setBuscando(true);
-    try { const res = await axios.get(`http://localhost:3000/api/clientes/dni/${dni}`, { headers }); setCliente(res.data); }
+    try { const res = await axios.get(`http://localhost:3000/api/clientes/dni/${dni}`, { headers }); setCliente(res.data); setMsg(''); }
     catch { setCliente(null); setMsg('Cliente no encontrado. Complete los datos para registrarlo.'); }
     finally { setBuscando(false); }
   };
@@ -41,18 +41,12 @@ export default function Ventas() {
         </div>
         {cliente ? (
           <div className="grid grid-cols-2 gap-3 text-sm text-gray-600 bg-green-50 p-3 rounded-lg">
-<<<<<<< HEAD
-            <p><span className="font-medium">ID del Cliente:</span> {cliente.id}</p>
-=======
->>>>>>> ccc836f4984e8d0d1feea1f90e713fa4d43b9b4e
+            <p><span className="font-medium">ID:</span> {cliente.id}</p>
             <p><span className="font-medium">Nombre:</span> {cliente.nombres} {cliente.apellidos}</p>
             <p><span className="font-medium">Móvil:</span> {cliente.telefono_movil}</p>
             <p><span className="font-medium">Email:</span> {cliente.correo_electronico}</p>
             <p><span className="font-medium">Banco:</span> {cliente.entidad_bancaria}</p>
-<<<<<<< HEAD
             <p><span className="font-medium">DNI:</span> {cliente.dni}</p>
-=======
->>>>>>> ccc836f4984e8d0d1feea1f90e713fa4d43b9b4e
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
@@ -61,8 +55,6 @@ export default function Ventas() {
             ))}
           </div>
         )}
-<<<<<<< HEAD
-
         {!cliente && (
           <button
             onClick={async () => {
@@ -79,8 +71,6 @@ export default function Ventas() {
             Registrar Cliente
           </button>
         )}
-=======
->>>>>>> ccc836f4984e8d0d1feea1f90e713fa4d43b9b4e
       </div>
       <div className="bg-white rounded-xl shadow p-5 mb-5">
         <h3 className="font-semibold text-gray-700 mb-3">Datos de Venta</h3>
@@ -88,22 +78,15 @@ export default function Ventas() {
           <div><label className="text-xs text-gray-500">Fecha de venta</label><input type="date" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form.fecha_venta} onChange={(e) => setForm({ ...form, fecha_venta: e.target.value })} /></div>
           <div><label className="text-xs text-gray-500">Método de confirmación</label><select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form.metodo_confirmacion} onChange={(e) => setForm({ ...form, metodo_confirmacion: e.target.value })}>{['SMS','EMAIL','LLAMADA','PRESENCIAL'].map(m => <option key={m}>{m}</option>)}</select></div>
           <div><label className="text-xs text-gray-500">Grabación</label><select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form.grabacion} onChange={(e) => setForm({ ...form, grabacion: e.target.value })}>{['Agendado','Realizado','Pendiente'].map(g => <option key={g}>{g}</option>)}</select></div>
-<<<<<<< HEAD
-        {form.metodo_confirmacion === 'SMS' && (
-          <div>
-            <label className="text-xs text-gray-500">Código de seguridad</label>
-            <div className="flex gap-2">
-              <input className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50" value={form.codigo_seguridad} readOnly />
-              <button type="button" onClick={() => setForm({ ...form, codigo_seguridad: 'SMS-' + Math.floor(1000 + Math.random() * 9000) })}
-                className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700 whitespace-nowrap">
-                Generar
-              </button>
+          {form.metodo_confirmacion === 'SMS' && (
+            <div>
+              <label className="text-xs text-gray-500">Código de seguridad</label>
+              <div className="flex gap-2">
+                <input className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50" value={form.codigo_seguridad} readOnly />
+                <button type="button" onClick={() => setForm({ ...form, codigo_seguridad: 'SMS-' + Math.floor(1000 + Math.random() * 9000) })} className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700 whitespace-nowrap">Generar</button>
+              </div>
             </div>
-          </div>
-        )}
-=======
-          <div><label className="text-xs text-gray-500">Código de seguridad</label><input className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form.codigo_seguridad} onChange={(e) => setForm({ ...form, codigo_seguridad: e.target.value })} /></div>
->>>>>>> ccc836f4984e8d0d1feea1f90e713fa4d43b9b4e
+          )}
           <div className="col-span-2"><label className="text-xs text-gray-500">Estado BackOffice</label><select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form.estado_venta} onChange={(e) => setForm({ ...form, estado_venta: e.target.value })}>{estadosVenta.map(e => <option key={e}>{e}</option>)}</select></div>
           <div className="col-span-2"><label className="text-xs text-gray-500">Observación BackOffice</label><textarea className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" rows={3} value={form.observacion_backoffice} onChange={(e) => setForm({ ...form, observacion_backoffice: e.target.value })} /></div>
         </div>
