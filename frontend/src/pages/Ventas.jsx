@@ -15,9 +15,16 @@ export default function Ventas() {
   const [nuevoCliente, setNuevoCliente] = useState({ nombres: '', apellidos: '', nacionalidad: '', fecha_nacimiento: '', edad: '', telefono_fijo: '', telefono_movil: '', correo_electronico: '', entidad_bancaria: '', numero_cuenta: '' });
   const buscarCliente = async () => {
     if (!dni) return; setBuscando(true);
-    try { const res = await axios.get(`http://localhost:3000/api/clientes/dni/${dni}`, { headers }); setCliente(res.data); setMsg(''); }
-    catch { setCliente(null); setMsg('Cliente no encontrado. Complete los datos para registrarlo.'); }
-    finally { setBuscando(false); }
+    try {
+      const esNumero = /^\d+$/.test(dni) && dni.length <= 5;
+      const url = esNumero
+        ? `http://localhost:3000/api/clientes/id/${dni}`
+        : `http://localhost:3000/api/clientes/dni/${dni}`;
+      const res = await axios.get(url, { headers });
+      setCliente(res.data); setMsg('');
+    } catch {
+      setCliente(null); setMsg('Cliente no encontrado. Complete los datos para registrarlo.');
+    } finally { setBuscando(false); }
   };
   const handleGuardar = async () => {
     setGuardando(true); setMsg('');
@@ -36,7 +43,7 @@ export default function Ventas() {
       <div className="bg-white rounded-xl shadow p-5 mb-5">
         <h3 className="font-semibold text-gray-700 mb-3">Datos del Titular</h3>
         <div className="flex gap-3 mb-4">
-          <input className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1" placeholder="DNI" value={dni} onChange={(e) => setDni(e.target.value)} />
+          <input className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1" placeholder="DNI o ID de cliente" value={dni} onChange={(e) => setDni(e.target.value)} />
           <button onClick={buscarCliente} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">{buscando ? 'Buscando...' : 'Buscar'}</button>
         </div>
         {cliente ? (
