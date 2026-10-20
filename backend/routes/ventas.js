@@ -1,8 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { obtenerVentas, crearVenta, actualizarEstado } = require('../controllers/ventasController');
+const { obtenerVentas, obtenerEstadisticas, crearVenta, editarVenta, eliminarVenta } = require('../controllers/ventasController');
 const { verificarToken } = require('../middleware/auth');
+
 router.get('/', verificarToken, obtenerVentas);
+router.get('/estadisticas', verificarToken, obtenerEstadisticas);
 router.post('/', verificarToken, crearVenta);
-router.put('/:id/estado', verificarToken, actualizarEstado);
+router.put('/:id', verificarToken, editarVenta);
+router.delete('/:id', verificarToken, eliminarVenta);
+
 module.exports = router;

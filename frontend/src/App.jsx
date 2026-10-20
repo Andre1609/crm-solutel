@@ -6,7 +6,15 @@ import Historial from './pages/Historial';
 import Agendados from './pages/Agendados';
 import Archivos from './pages/Archivos';
 import Usuarios from './pages/Usuarios';
-const PrivateRoute = ({ children }) => { const { token } = useAuth(); return token ? children : <Navigate to="/login" />; };
+import BackOffice from './pages/BackOffice';
+
+const PrivateRoute = ({ children, roles }) => {
+  const { token, usuario } = useAuth();
+  if (!token) return <Navigate to="/login" />;
+  if (roles && !roles.includes(usuario?.rol_id)) return <Navigate to="/ventas" />;
+  return children;
+};
+
 function AppRoutes() {
   return (
     <Routes>
@@ -15,11 +23,19 @@ function AppRoutes() {
       <Route path="/historial" element={<PrivateRoute><Historial /></PrivateRoute>} />
       <Route path="/agendados" element={<PrivateRoute><Agendados /></PrivateRoute>} />
       <Route path="/archivos" element={<PrivateRoute><Archivos /></PrivateRoute>} />
-      <Route path="/usuarios" element={<PrivateRoute><Usuarios /></PrivateRoute>} />
+      <Route path="/backoffice" element={<PrivateRoute roles={[1, 2, 3]}><BackOffice /></PrivateRoute>} />
+      <Route path="/personal" element={<PrivateRoute roles={[1]}><Usuarios /></PrivateRoute>} />
       <Route path="*" element={<Navigate to="/login" />} />
     </Routes>
   );
 }
+
 export default function App() {
-  return (<AuthProvider><BrowserRouter><AppRoutes /></BrowserRouter></AuthProvider>);
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </AuthProvider>
+  );
 }
