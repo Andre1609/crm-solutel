@@ -10,12 +10,17 @@ const rolColores = {
   'Asesor': 'bg-green-100 text-green-700',
 };
 
+const POR_PAGINA = 10;
+
 export default function Usuarios() {
   const { token } = useAuth();
   const headers = { Authorization: `Bearer ${token}` };
   const [personal, setPersonal] = useState([]);
   const [roles, setRoles] = useState([]);
   const [equipos, setEquipos] = useState([]);
+  const [filtro, setFiltro] = useState('');
+  const [equipoFiltro, setEquipoFiltro] = useState('');
+  const [pagina, setPagina] = useState(1);
   const [form, setForm] = useState({ personal_nombres: '', personal_apellidos: '', personal_email: '', password: '', personal_rol_id: '', personal_equipo_id: '' });
   const [msg, setMsg] = useState('');
   const [seleccionado, setSeleccionado] = useState(null);
@@ -32,6 +37,27 @@ export default function Usuarios() {
     axios.get('http://localhost:3000/api/catalogo/roles', { headers }).then(res => setRoles(res.data));
     axios.get('http://localhost:3000/api/catalogo/equipos', { headers }).then(res => setEquipos(res.data));
   }, []);
+
+  const filtradas = personal.filter(p => {
+    const nombreCompleto = `${p.personal_nombres} ${p.personal_apellidos}`.toLowerCase();
+    const coincideTexto = nombreCompleto.includes(filtro.toLowerCase()) || p.personal_email?.toLowerCase().includes(filtro.toLowerCase());
+    
+    let coincideEquipo = true;
+    if (equipoFiltro === 'sin_equipo') {
+      coincideEquipo = !p.personal_equipo_id;
+    } else if (equipoFiltro) {
+      coincideEquipo = String(p.personal_equipo_id) === String(equipoFiltro);
+    }
+    
+    return coincideTexto && coincideEquipo;
+  });
+
+  const totalPaginas = Math.ceil(filtradas.length / POR_PAGINA) || 1;
+  const inicio = (pagina - 1) * POR_PAGINA;
+  const paginadas = filtradas.slice(inicio, inicio + POR_PAGINA);
+  const filasVacias = POR_PAGINA - paginadas.length;
+
+  useEffect(() => { setPagina(1); }, [filtro, equipoFiltro]);
 
   const handleCrear = async () => {
     try {
@@ -83,7 +109,6 @@ export default function Usuarios() {
     <Layout>
       <h2 className="text-xl font-bold text-gray-800 mb-6">Gestión de Personal</h2>
 
-      {/* Formulario nuevo personal */}
       <div className="bg-white rounded-xl shadow p-5 mb-6">
         <h3 className="font-semibold text-gray-700 mb-3">Nuevo Personal</h3>
         {msg && <p className="text-sm mb-3">{msg}</p>}
@@ -110,47 +135,109 @@ export default function Usuarios() {
         <button onClick={handleCrear} className="mt-4 bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg text-sm">Crear Personal</button>
       </div>
 
-      {/* Tabla */}
-      <div className="bg-white rounded-xl shadow overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-            <tr>
-              <th className="px-4 py-3 text-left">Nombre</th>
-              <th className="px-4 py-3 text-left">Email</th>
-              <th className="px-4 py-3 text-left">Rol</th>
-              <th className="px-4 py-3 text-left">Equipo</th>
-              <th className="px-4 py-3 text-left">Estado</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {personal.map((p) => (
-              <tr key={p.personal_id}
-                className="hover:bg-gray-50 cursor-pointer"
-                onClick={() => abrirModal(p)}>
-                <td className="px-4 py-3 font-medium text-gray-800">{p.personal_nombres} {p.personal_apellidos}</td>
-                <td className="px-4 py-3 text-gray-500">{p.personal_email}</td>
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${rolColores[p.rol_nombre] || 'bg-gray-100 text-gray-600'}`}>{p.rol_nombre}</span>
-                </td>
-                <td className="px-4 py-3 text-gray-500">{p.equipo_nombre || '-'}</td>
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-1 rounded-full text-xs ${p.personal_activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                    {p.personal_activo ? 'Activo' : 'Inactivo'}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="flex gap-2 mb-4 flex-wrap">
+        <input 
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-52"
+          placeholder="Buscar por nombre o email..."
+          value={filtro} 
+          onChange={(e) => setFiltro(e.target.value)} 
+        />
+        <select 
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          value={equipoFiltro} 
+          onChange={(e) => setEquipoFiltro(e.target.value)}
+        >
+          <option value="">Todos los equipos</option>
+          <option value="sin_equipo">Sin equipo</option>
+          {equipos.map(e => (
+            <option key={e.equipo_id} value={e.equipo_id}>{e.equipo_nombre}</option>
+          ))}
+        </select>
       </div>
 
-      {/* Modal */}
+      <p className="text-xs text-gray-500 mb-3">{filtradas.length} resultado(s)</p>
+
+      <div className="bg-white rounded-xl shadow overflow-hidden">
+        <table className="w-full text-sm table-fixed">
+          <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+            <tr>
+              <th className="px-4 py-3 text-left w-52">Nombre</th>
+              <th className="px-4 py-3 text-left w-56">Email</th>
+              <th className="px-4 py-3 text-left w-36">Rol</th>
+              <th className="px-4 py-3 text-left w-36">Equipo</th>
+              <th className="px-4 py-3 text-left w-28">Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtradas.length === 0 ? (
+              <>
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">No hay personal registrado</td></tr>
+                {Array.from({ length: POR_PAGINA - 1 }).map((_, i) => (
+                  <tr key={`empty-${i}`} className="border-t border-gray-50"><td colSpan={5} className="h-10" /></tr>
+                ))}
+              </>
+            ) : (
+              <>
+                {paginadas.map((p) => (
+                  <tr key={p.personal_id}
+                    className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer h-10"
+                    onClick={() => abrirModal(p)}>
+                    <td className="px-4 py-2 font-medium text-gray-800 truncate">{p.personal_nombres} {p.personal_apellidos}</td>
+                    <td className="px-4 py-2 text-gray-500 truncate">{p.personal_email}</td>
+                    <td className="px-4 py-2">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${rolColores[p.rol_nombre] || 'bg-gray-100 text-gray-600'}`}>{p.rol_nombre}</span>
+                    </td>
+                    <td className="px-4 py-2 text-gray-500 truncate">{p.equipo_nombre || '-'}</td>
+                    <td className="px-4 py-2">
+                      <span className={`px-2 py-0.5 rounded-full text-xs whitespace-nowrap ${p.personal_activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                        {p.personal_activo ? 'Activo' : 'Inactivo'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {Array.from({ length: filasVacias }).map((_, i) => (
+                  <tr key={`pad-${i}`} className="border-t border-gray-50 h-10"><td colSpan={5} /></tr>
+                ))}
+              </>
+            )}
+          </tbody>
+        </table>
+
+        <div className="px-4 py-3 border-t flex items-center justify-between">
+          <p className="text-xs text-gray-500">
+            {filtradas.length > 0 ? `Página ${pagina} de ${totalPaginas} — mostrando ${inicio + 1} a ${Math.min(inicio + POR_PAGINA, filtradas.length)} de ${filtradas.length}` : '0 resultados'}
+          </p>
+          {totalPaginas > 1 && (
+            <div className="flex items-center gap-1">
+              <button onClick={() => setPagina(1)} disabled={pagina === 1}
+                className="px-2 py-1 rounded text-xs border border-gray-300 disabled:opacity-40 hover:bg-gray-50">«</button>
+              <button onClick={() => setPagina(p => p - 1)} disabled={pagina === 1}
+                className="px-3 py-1 rounded text-xs border border-gray-300 disabled:opacity-40 hover:bg-gray-50">‹</button>
+              {Array.from({ length: Math.min(5, totalPaginas) }, (_, i) => {
+                let p;
+                if (totalPaginas <= 5) p = i + 1;
+                else if (pagina <= 3) p = i + 1;
+                else if (pagina >= totalPaginas - 2) p = totalPaginas - 4 + i;
+                else p = pagina - 2 + i;
+                return (
+                  <button key={p} onClick={() => setPagina(p)}
+                    className={`px-3 py-1 rounded text-xs border ${pagina === p ? 'bg-green-600 text-white border-green-600' : 'border-gray-300 hover:bg-gray-50'}`}>
+                    {p}
+                  </button>
+                );
+              })}
+              <button onClick={() => setPagina(p => p + 1)} disabled={pagina === totalPaginas}
+                className="px-3 py-1 rounded text-xs border border-gray-300 disabled:opacity-40 hover:bg-gray-50">›</button>
+              <button onClick={() => setPagina(totalPaginas)} disabled={pagina === totalPaginas}
+                className="px-2 py-1 rounded text-xs border border-gray-300 disabled:opacity-40 hover:bg-gray-50">»</button>
+            </div>
+          )}
+        </div>
+      </div>
+
       {seleccionado && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          {/* Fondo difuminado */}
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={cerrarModal} />
-
-          {/* Card del modal */}
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 z-10">
             <button onClick={cerrarModal} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl font-bold">✕</button>
 

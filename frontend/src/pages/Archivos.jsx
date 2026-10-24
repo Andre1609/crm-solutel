@@ -14,6 +14,7 @@ export default function Archivos() {
   const [dragging, setDragging] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
   const [msg, setMsg] = useState('');
+  const [confirmEliminar, setConfirmEliminar] = useState(null);
 
   const cargarDocumentos = () => {
     axios.get('http://localhost:3000/api/documentos', { headers }).then(res => setDocumentos(res.data));
@@ -47,11 +48,11 @@ export default function Archivos() {
     finally { setSubiendo(false); }
   };
 
-  const handleEliminar = async (id) => {
-    if (!confirm('¿Seguro que quieres eliminar este documento?')) return;
+  const handleEliminar = async () => {
     try {
-      await axios.delete(`http://localhost:3000/api/documentos/${id}`, { headers });
+      await axios.delete(`http://localhost:3000/api/documentos/${confirmEliminar}`, { headers });
       setMsg('✅ Documento eliminado');
+      setConfirmEliminar(null);
       cargarDocumentos();
     } catch { setMsg('❌ Error al eliminar'); }
   };
@@ -137,7 +138,7 @@ export default function Archivos() {
                     className="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs hover:bg-blue-700">
                     Abrir
                   </button>
-                  <button onClick={() => handleEliminar(d.documento_id)}
+                  <button onClick={() => setConfirmEliminar(d.documento_id)}
                     className="bg-red-500 text-white px-3 py-1 rounded-lg text-xs hover:bg-red-600">
                     Eliminar
                   </button>
@@ -150,6 +151,27 @@ export default function Archivos() {
           </tbody>
         </table>
       </div>
+
+      {confirmEliminar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setConfirmEliminar(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 z-10 text-center">
+            <div className="text-5xl mb-3">🗑️</div>
+            <h3 className="text-lg font-bold text-gray-800 mb-2">¿Eliminar documento?</h3>
+            <p className="text-sm text-gray-500 mb-6">Esta acción no se puede deshacer.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmEliminar(null)}
+                className="flex-1 border border-gray-300 text-gray-600 py-2 rounded-lg text-sm">
+                Cancelar
+              </button>
+              <button onClick={handleEliminar}
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg text-sm font-medium">
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }

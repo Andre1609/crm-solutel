@@ -22,12 +22,14 @@ export default function Sidebar() {
   const rol = usuario?.rol_id;
 
   const links = [
-    { to: '/ventas', label: 'Ventas', roles: [1, 2, 3, 4] },
-    { to: '/historial', label: 'Historial', roles: [1, 2, 3, 4] },
-    { to: '/agendados', label: 'Agendados', roles: [1, 2, 3, 4] },
-    { to: '/archivos', label: 'Archivos', roles: [1, 2, 3, 4] },
-    { to: '/backoffice', label: 'BackOffice', roles: [1, 2, 3] },
+    { to: '/ventas', label: 'Ventas', roles: [1, 2, 4] },
+    { to: '/historial', label: 'Historial', roles: [1, 2] },
+    { to: '/agendados', label: 'Agendados', roles: [1, 2, 4] },
+    { to: '/archivos', label: 'Archivos', roles: [1, 2, 4] },
+    { to: '/backoffice', label: 'Dashboard', roles: [1, 2] },
+    { to: '/auditoria', label: 'Auditoría', roles: [1, 3] },
     { to: '/personal', label: 'Personal', roles: [1] },
+    
   ].filter(l => l.roles.includes(rol));
 
   return (

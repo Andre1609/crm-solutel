@@ -2,15 +2,13 @@ const db = require('../config/db');
 
 const obtenerVentas = (req, res) => {
   const { rol_id, equipo_id } = req.usuario;
-  
- 
   let filtroEquipo = '';
   let params = [];
-  if (rol_id === 2 && equipo_id) {
+
+  if ((rol_id === 2 || rol_id === 3) && equipo_id) {
     filtroEquipo = 'WHERE p.personal_equipo_id = ?';
     params = [equipo_id];
   }
-
   const sql = `
     SELECT v.*,
       CONCAT(t.titular_nombres, ' ', t.titular_apellidos) AS titular,
@@ -36,54 +34,22 @@ const obtenerVentas = (req, res) => {
 
 const obtenerEstadisticas = (req, res) => {
   const { rol_id, equipo_id } = req.usuario;
-  
-  let filtroEquipo = rol_id === 2 && equipo_id ? `AND p.personal_equipo_id = ${equipo_id}` : '';
+  let filtroEquipo = (rol_id === 2 || rol_id === 3) && equipo_id ? `AND p.personal_equipo_id = ${equipo_id}` : '';
 
-  const sqlEstados = `
-    SELECT v.venta_estado, COUNT(*) as total
-    FROM ventas v
-    JOIN personal p ON v.venta_asesor_id = p.personal_id
-    WHERE 1=1 ${filtroEquipo}
-    GROUP BY v.venta_estado
-  `;
-
-  const sqlCampanas = `
-    SELECT c.campana_nombre, COUNT(*) as total
-    FROM ventas v
-    JOIN personal p ON v.venta_asesor_id = p.personal_id
-    JOIN campanas c ON v.venta_campana_id = c.campana_id
-    WHERE 1=1 ${filtroEquipo}
-    GROUP BY c.campana_nombre
-  `;
-
-  const sqlEquipos = `
-    SELECT e.equipo_nombre, COUNT(*) as total
-    FROM ventas v
-    JOIN personal p ON v.venta_asesor_id = p.personal_id
-    LEFT JOIN equipos e ON p.personal_equipo_id = e.equipo_id
-    WHERE 1=1 ${filtroEquipo}
-    GROUP BY e.equipo_nombre
-  `;
-
-  const sqlAsesores = `
-    SELECT CONCAT(p.personal_nombres, ' ', p.personal_apellidos) AS asesor, 
-      COUNT(*) as total,
-      SUM(CASE WHEN v.venta_estado = 'ACTIVADO' THEN 1 ELSE 0 END) as activadas
-    FROM ventas v
-    JOIN personal p ON v.venta_asesor_id = p.personal_id
-    WHERE 1=1 ${filtroEquipo}
-    GROUP BY p.personal_id
-    ORDER BY total DESC
-    LIMIT 10
-  `;
+  const sqlEstados = `SELECT v.venta_estado, COUNT(*) as total FROM ventas v JOIN personal p ON v.venta_asesor_id = p.personal_id WHERE 1=1 ${filtroEquipo} GROUP BY v.venta_estado`;
+  const sqlCampanas = `SELECT c.campana_nombre, COUNT(*) as total FROM ventas v JOIN personal p ON v.venta_asesor_id = p.personal_id JOIN campanas c ON v.venta_campana_id = c.campana_id WHERE 1=1 ${filtroEquipo} GROUP BY c.campana_nombre`;
+  const sqlEquipos = `SELECT COALESCE(e.equipo_nombre, 'Sin equipo') as equipo_nombre, COUNT(*) as total FROM ventas v JOIN personal p ON v.venta_asesor_id = p.personal_id LEFT JOIN equipos e ON p.personal_equipo_id = e.equipo_id WHERE 1=1 ${filtroEquipo} GROUP BY e.equipo_nombre`;
+  const sqlAsesores = `SELECT CONCAT(p.personal_nombres, ' ', p.personal_apellidos) AS asesor, COUNT(*) as total, SUM(CASE WHEN v.venta_estado = 'ACTIVADO' THEN 1 ELSE 0 END) as activadas FROM ventas v JOIN personal p ON v.venta_asesor_id = p.personal_id WHERE 1=1 ${filtroEquipo} GROUP BY p.personal_id ORDER BY total DESC LIMIT 10`;
+  const sqlBacks = `SELECT CONCAT(p.personal_nombres, ' ', p.personal_apellidos) AS back_nombre, COUNT(*) as total_gestionadas, SUM(CASE WHEN v.venta_estado = 'ACTIVADO' THEN 1 ELSE 0 END) as activadas, SUM(CASE WHEN v.venta_estado IN ('CANCELADO','BAJA','VERI KO') THEN 1 ELSE 0 END) as rechazadas, SUM(CASE WHEN v.venta_estado = 'PDT FIRMA' THEN 1 ELSE 0 END) as pendientes FROM ventas v JOIN personal p ON v.venta_back_id = p.personal_id WHERE v.venta_back_id IS NOT NULL GROUP BY p.personal_id ORDER BY total_gestionadas DESC`;
 
   Promise.all([
-    new Promise((resolve, reject) => db.query(sqlEstados, (err, r) => err ? reject(err) : resolve(r))),
-    new Promise((resolve, reject) => db.query(sqlCampanas, (err, r) => err ? reject(err) : resolve(r))),
-    new Promise((resolve, reject) => db.query(sqlEquipos, (err, r) => err ? reject(err) : resolve(r))),
-    new Promise((resolve, reject) => db.query(sqlAsesores, (err, r) => err ? reject(err) : resolve(r))),
-  ]).then(([estados, campanas, equipos, asesores]) => {
-    res.json({ estados, campanas, equipos, asesores });
+    new Promise((r, j) => db.query(sqlEstados, (e, res) => e ? j(e) : r(res))),
+    new Promise((r, j) => db.query(sqlCampanas, (e, res) => e ? j(e) : r(res))),
+    new Promise((r, j) => db.query(sqlEquipos, (e, res) => e ? j(e) : r(res))),
+    new Promise((r, j) => db.query(sqlAsesores, (e, res) => e ? j(e) : r(res))),
+    new Promise((r, j) => db.query(sqlBacks, (e, res) => e ? j(e) : r(res))),
+  ]).then(([estados, campanas, equipos, asesores, backs]) => {
+    res.json({ estados, campanas, equipos, asesores, backs });
   }).catch(() => res.status(500).json({ mensaje: 'Error al obtener estadísticas' }));
 };
 
