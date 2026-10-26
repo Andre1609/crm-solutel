@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Ventas from './pages/Ventas';
+import MisVentas from './pages/MisVentas';
 import Historial from './pages/Historial';
 import Agendados from './pages/Agendados';
 import Archivos from './pages/Archivos';
@@ -32,9 +33,10 @@ function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<HomeRedirect />} />
       <Route path="/ventas" element={<PrivateRoute roles={[1, 2, 4]}><Ventas /></PrivateRoute>} />
+      <Route path="/mis-ventas" element={<PrivateRoute roles={[4]}><MisVentas /></PrivateRoute>} />
       <Route path="/historial" element={<PrivateRoute roles={[1, 2]}><Historial /></PrivateRoute>} />
       <Route path="/agendados" element={<PrivateRoute roles={[1, 2, 4]}><Agendados /></PrivateRoute>} />
-      <Route path="/archivos" element={<PrivateRoute roles={[1, 2, 4]}><Archivos /></PrivateRoute>} />
+      <Route path="/archivos" element={<PrivateRoute roles={[1, 2]}><Archivos /></PrivateRoute>} />
       <Route path="/backoffice" element={<PrivateRoute roles={[1, 2]}><BackOffice /></PrivateRoute>} />
       <Route path="/auditoria" element={<PrivateRoute roles={[1, 3]}><Auditoria /></PrivateRoute>} />
       <Route path="/personal" element={<PrivateRoute roles={[1]}><Usuarios /></PrivateRoute>} />

@@ -9,6 +9,7 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
+const uploadVenta = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 const obtenerDocumentos = (req, res) => {
   db.query('SELECT * FROM documentos ORDER BY documento_subido_en DESC', (err, results) => {
@@ -48,4 +49,4 @@ const eliminarDocumento = (req, res) => {
   });
 };
 
-module.exports = { upload, obtenerDocumentos, subirDocumento, eliminarDocumento };
+module.exports = { upload, uploadVenta, obtenerDocumentos, subirDocumento, eliminarDocumento };

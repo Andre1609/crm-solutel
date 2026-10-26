@@ -22,10 +22,11 @@ export default function Sidebar() {
   const rol = usuario?.rol_id;
 
   const links = [
-    { to: '/ventas', label: 'Ventas', roles: [1, 2, 4] },
+    { to: '/mis-ventas', label: 'Ventas', roles: [4] },
+    { to: '/ventas', label: 'Cargar', roles: [1, 2, 4] },
     { to: '/historial', label: 'Historial', roles: [1, 2] },
     { to: '/agendados', label: 'Agendados', roles: [1, 2, 4] },
-    { to: '/archivos', label: 'Archivos', roles: [1, 2, 4] },
+    { to: '/archivos', label: 'Archivos', roles: [1, 2] },
     { to: '/backoffice', label: 'Dashboard', roles: [1, 2] },
     { to: '/auditoria', label: 'Auditoría', roles: [1, 3] },
     { to: '/personal', label: 'Personal', roles: [1] },

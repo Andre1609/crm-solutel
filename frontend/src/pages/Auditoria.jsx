@@ -37,7 +37,10 @@ export default function Auditoria() {
   const [filtroEquipo, setFiltroEquipo] = useState('');
   const [pagina, setPagina] = useState(1);
   const [seleccionada, setSeleccionada] = useState(null);
-  const [checklist, setChecklist] = useState({});
+  const [comentarios, setComentarios] = useState([]);
+  const [nuevoComentario, setNuevoComentario] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [cargandoComentarios, setCargandoComentarios] = useState(false);
   const [nuevoEstado, setNuevoEstado] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [cargando, setCargando] = useState(true);
@@ -57,19 +60,36 @@ export default function Auditoria() {
     }
   }, []);
 
+  const cargarComentarios = (ventaId) => {
+    setCargandoComentarios(true);
+    axios.get(`http://localhost:3000/api/ventas/${ventaId}/comentarios`, { headers })
+      .then(res => setComentarios(res.data))
+      .catch(() => setComentarios([]))
+      .finally(() => setCargandoComentarios(false));
+  };
+
   const abrirModal = (v) => {
     setSeleccionada(v);
     setNuevoEstado(v.venta_estado);
-    const saved = localStorage.getItem(`checklist_${v.venta_id}`);
-    setChecklist(saved ? JSON.parse(saved) : {});
+    setNuevoComentario('');
+    setComentarios([]);
+    cargarComentarios(v.venta_id);
   };
 
-  const cerrarModal = () => {
-    if (seleccionada) localStorage.setItem(`checklist_${seleccionada.venta_id}`, JSON.stringify(checklist));
-    setSeleccionada(null);
-  };
+  const cerrarModal = () => setSeleccionada(null);
 
-  const toggleCheck = (key) => setChecklist(prev => ({ ...prev, [key]: !prev[key] }));
+  const handleEnviarComentario = async () => {
+    const texto = nuevoComentario.trim();
+    if (!texto) return;
+    setEnviando(true);
+    try {
+      await axios.post(`http://localhost:3000/api/ventas/${seleccionada.venta_id}/comentarios`,
+        { comentario_texto: texto }, { headers });
+      setNuevoComentario('');
+      cargarComentarios(seleccionada.venta_id);
+    } catch { alert('Error al guardar el comentario'); }
+    finally { setEnviando(false); }
+  };
 
   const handleGuardarEstado = async () => {
     setGuardando(true);
@@ -81,26 +101,10 @@ export default function Auditoria() {
         venta_observacion: seleccionada.venta_observacion,
         venta_fecha: seleccionada.venta_fecha ? seleccionada.venta_fecha.split('T')[0] : null,
       }, { headers });
-      localStorage.removeItem(`checklist_${seleccionada.venta_id}`);
       cargarVentas();
       setSeleccionada(null);
     } catch { alert('Error al guardar'); }
     finally { setGuardando(false); }
-  };
-
-  const checklistItems = [
-    'Identidad y datos del titular verificados',
-    'Campaña y tarifa explicadas correctamente',
-    'Precio final comunicado al cliente',
-    'Consentimiento explícito registrado',
-    'Documentación completa y correcta',
-  ];
-
-  const checkCount = Object.values(checklist).filter(Boolean).length;
-  const tieneProgreso = (v) => {
-    const saved = localStorage.getItem(`checklist_${v.venta_id}`);
-    if (!saved) return false;
-    return Object.values(JSON.parse(saved)).some(Boolean);
   };
 
   const filtradas = ventas.filter(v => {
@@ -267,7 +271,6 @@ export default function Auditoria() {
             ) : (
               <>
                 {paginadas.map(v => {
-                  const progreso = tieneProgreso(v);
                   return (
                     <tr key={v.venta_id} className="border-t border-gray-100 hover:bg-gray-50 h-10">
                       <td className="px-5 py-2">
@@ -294,15 +297,9 @@ export default function Auditoria() {
                         </span>
                       </td>
                       <td className="px-4 py-2">
-                        <button onClick={() => {
-                          if (v.venta_estado === 'PDT FIRMA' || tieneProgreso(v)) {
-                            navigate(`/matriz/${v.venta_id}`);
-                          } else {
-                            abrirModal(v);
-                          }
-                        }}
+                        <button onClick={() => abrirModal(v)}
                           className="flex items-center gap-1 border border-gray-300 text-gray-600 px-2 py-1 rounded-lg text-xs hover:bg-gray-50 transition whitespace-nowrap">
-                          {tieneProgreso(v) ? '📋 Ver detalle' : v.venta_estado === 'PDT FIRMA' ? 'Revisar' : 'Ver detalle'} ›
+                          Ver detalle ›
                         </button>
                       </td>
                     </tr>
@@ -387,22 +384,38 @@ export default function Auditoria() {
               <div>
                 <div className="mb-4">
                   <div className="flex justify-between items-center mb-1">
-                    <p className="font-semibold text-gray-700 text-sm">Checklist de validación</p>
-                    <span className="text-xs text-blue-600 font-medium">{checkCount}/{checklistItems.length}</span>
+                    <p className="font-semibold text-gray-700 text-sm">Comentarios</p>
+                    <span className="text-xs text-blue-600 font-medium">{comentarios.length}</span>
                   </div>
-                  <p className="text-xs text-gray-400 mb-2">Confirma cada punto antes de cambiar el estado.</p>
-                  <div className="w-full bg-gray-100 rounded-full h-1.5 mb-3">
-                    <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${(checkCount / checklistItems.length) * 100}%` }} />
-                  </div>
-                  <div className="space-y-2">
-                    {checklistItems.map((item, i) => (
-                      <label key={i} className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition ${checklist[i] ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
-                        <input type="checkbox" checked={!!checklist[i]} onChange={() => toggleCheck(i)} className="w-4 h-4 accent-blue-600" />
-                        <span className={`text-xs ${checklist[i] ? 'text-blue-700 font-medium' : 'text-gray-600'}`}>{item}</span>
-                      </label>
+                  <p className="text-xs text-gray-400 mb-2">Deja observaciones sobre esta venta para el equipo.</p>
+                  <textarea
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none"
+                    rows={3} maxLength={1000}
+                    placeholder="Escribe un comentario..."
+                    value={nuevoComentario}
+                    onChange={(e) => setNuevoComentario(e.target.value)} />
+                  <button onClick={handleEnviarComentario} disabled={enviando || !nuevoComentario.trim()}
+                    className="mt-2 w-full bg-gray-800 hover:bg-gray-900 disabled:opacity-40 text-white py-2 rounded-lg text-sm font-medium transition">
+                    {enviando ? 'Enviando...' : '💬 Agregar comentario'}
+                  </button>
+                  <div className="space-y-2 mt-3 max-h-48 overflow-y-auto">
+                    {cargandoComentarios ? (
+                      <p className="text-xs text-gray-400 text-center py-2">Cargando comentarios...</p>
+                    ) : comentarios.length === 0 ? (
+                      <p className="text-xs text-gray-400 text-center py-2">Aún no hay comentarios.</p>
+                    ) : comentarios.map(c => (
+                      <div key={c.comentario_id} className="bg-white border border-gray-200 rounded-lg p-2.5">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-xs font-semibold text-gray-700">{c.autor}</span>
+                          <span className="text-xs text-gray-400">
+                            {new Date(c.comentario_creado_en).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600 whitespace-pre-wrap break-words">{c.comentario_texto}</p>
+                      </div>
                     ))}
                   </div>
-                  <p className="text-xs text-gray-400 mt-2">Las decisiones quedan registradas con fecha, hora y usuario.</p>
+                  <p className="text-xs text-gray-400 mt-2">Cada comentario queda registrado con fecha, hora y autor.</p>
                 </div>
 
                 <div className="bg-gray-50 rounded-xl p-4">
@@ -421,7 +434,7 @@ export default function Auditoria() {
 
             <div className="flex justify-between items-center px-5 py-3 border-t bg-gray-50">
               <button onClick={cerrarModal} className="text-sm text-gray-500 hover:text-gray-700">
-                Guardar y continuar después
+                Cerrar
               </button>
             </div>
           </div>

@@ -3,6 +3,8 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
 
+const tiposDocumento = ['GRABACION','DNI','CONTRATO','FACTURA','OTRO'];
+const MAX_MB = 10;
 const estadosVenta = ['PDT FIRMA','FIRMADO','CANCELADO','BAJA RECUPERADA','BAJA NO RECUPERADA','ACTIVADO','BAJA','VERI KO','VOLTEADA'];
 
 export default function Ventas() {
@@ -16,6 +18,8 @@ export default function Ventas() {
   const [buscando, setBuscando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg] = useState('');
+  const [archivos, setArchivos] = useState([]);
+  const [dragging, setDragging] = useState(false);
 
   const [nuevoTitular, setNuevoTitular] = useState({
     titular_dni: '', titular_nombres: '', titular_apellidos: '', titular_nacionalidad: '',
@@ -59,18 +63,44 @@ export default function Ventas() {
     } catch { setMsg('❌ Error al registrar titular'); }
   };
 
+  const agregarArchivos = (lista) => {
+    const nuevos = [];
+    let rechazados = 0;
+    Array.from(lista).forEach(f => {
+      if (f.size > MAX_MB * 1024 * 1024) { rechazados++; return; }
+      nuevos.push({ id: `${Date.now()}-${Math.random()}`, file: f, tipo: 'OTRO' });
+    });
+    if (nuevos.length) setArchivos(prev => [...prev, ...nuevos]);
+    if (rechazados) setMsg(`❌ ${rechazados} archivo(s) superan los ${MAX_MB} MB y no se agregaron`);
+  };
+
+  const handleDrop = (e) => { e.preventDefault(); setDragging(false); agregarArchivos(e.dataTransfer.files); };
+  const cambiarTipo = (id, tipo) => setArchivos(prev => prev.map(a => a.id === id ? { ...a, tipo } : a));
+  const quitarArchivo = (id) => setArchivos(prev => prev.filter(a => a.id !== id));
+
   const handleGuardar = async () => {
     if (!titular) return setMsg('❌ Primero busca o registra un titular');
     setGuardando(true); setMsg('');
     try {
-      await axios.post('http://localhost:3000/api/ventas', {
-        ...form,
-        venta_titular_id: titular.titular_id
-      }, { headers });
-      setMsg('✅ Venta guardada correctamente');
-      setTitular(null); setBusqueda('');
+      // Venta y archivos viajan en una sola petición: si algo falla, no se guarda nada
+      const formData = new FormData();
+      Object.entries({ ...form, venta_titular_id: titular.titular_id })
+        .forEach(([k, v]) => formData.append(k, v ?? ''));
+      archivos.forEach(a => formData.append('archivos', a.file));
+      formData.append('documento_tipos', JSON.stringify(archivos.map(a => a.tipo)));
+
+      await axios.post('http://localhost:3000/api/ventas', formData, {
+        headers: { ...headers, 'Content-Type': 'multipart/form-data' }
+      });
+
+      setMsg(archivos.length > 0
+        ? `✅ Venta guardada correctamente con ${archivos.length} archivo(s)`
+        : '✅ Venta guardada correctamente');
+      setTitular(null); setBusqueda(''); setArchivos([]);
       setForm({ venta_fecha: '', venta_campana_id: '', venta_tarifa_id: '', venta_metodo_confirmacion: 'LLAMADA', venta_codigo_sms: '', venta_estado: 'PDT FIRMA', venta_observacion: '' });
-    } catch { setMsg('❌ Error al guardar la venta'); }
+    } catch (err) {
+      setMsg(`❌ No se guardó la venta: ${err.response?.data?.mensaje || 'no hay conexión con el servidor'}. Revisa los datos y vuelve a intentarlo.`);
+    }
     finally { setGuardando(false); }
   };
 
@@ -188,6 +218,42 @@ export default function Ventas() {
               value={form.venta_observacion} onChange={(e) => setForm({ ...form, venta_observacion: e.target.value })} />
           </div>
         </div>
+      </div>
+
+      {/* Documentación */}
+      <div className="bg-white rounded-xl shadow p-5 mb-5">
+        <h3 className="font-semibold text-gray-700 mb-1">Documentación (opcional)</h3>
+        <p className="text-xs text-gray-400 mb-3">Los archivos se envían junto con la venta (máx. {MAX_MB} MB cada uno).</p>
+        <div onDrop={handleDrop}
+          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          className={`border-2 border-dashed rounded-xl p-8 text-center transition ${dragging ? 'border-green-400 bg-green-50' : 'border-gray-300 bg-gray-50'}`}>
+          <p className="text-gray-400 text-sm mb-3">Arrastra archivos aquí o</p>
+          <label className="bg-gray-700 text-white px-4 py-2 rounded-lg text-sm cursor-pointer hover:bg-gray-800 inline-block">
+            Seleccionar archivos
+            <input type="file" multiple className="hidden"
+              onChange={(e) => { agregarArchivos(e.target.files); e.target.value = ''; }} />
+          </label>
+        </div>
+
+        {archivos.length > 0 && (
+          <div className="mt-4 space-y-2">
+            {archivos.map(a => (
+              <div key={a.id} className="flex items-center gap-3 border border-gray-200 rounded-lg px-3 py-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-800 truncate">{a.file.name}</p>
+                  <p className="text-xs text-gray-400">{(a.file.size / 1024).toFixed(1)} KB</p>
+                </div>
+                <select className="border border-gray-300 rounded-lg px-2 py-1 text-xs"
+                  value={a.tipo} onChange={(e) => cambiarTipo(a.id, e.target.value)}>
+                  {tiposDocumento.map(t => <option key={t}>{t}</option>)}
+                </select>
+                <button type="button" onClick={() => quitarArchivo(a.id)}
+                  className="text-gray-400 hover:text-red-500 text-lg font-bold" title="Quitar">✕</button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <button onClick={handleGuardar} disabled={guardando}
