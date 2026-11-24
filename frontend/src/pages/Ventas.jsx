@@ -2,9 +2,23 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
+import { bancoDesdeIban, ibanEspanolValido } from '../utils/bancos';
+import { normalizarDocumento, documentoValido, completarLetraControl, TIPOS_DOCUMENTO } from '../utils/documentos';
 
 const tiposDocumento = ['GRABACION','DNI','CONTRATO','FACTURA','OTRO'];
 const MAX_MB = 10;
+const CAMPOS_TITULAR = [
+  'titular_nombres', 'titular_apellidos', 'titular_nacionalidad', 'titular_fecha_nacimiento', 'titular_edad',
+  'titular_telefono_fijo', 'titular_telefono_movil', 'titular_correo', 'titular_banco', 'titular_iban'
+];
+// Datos editables de un titular como texto (null -> '', fecha -> AAAA-MM-DD)
+const camposDe = (t) => Object.fromEntries(CAMPOS_TITULAR.map(k =>
+  [k, k === 'titular_fecha_nacimiento' ? String(t?.[k] ?? '').slice(0, 10) : String(t?.[k] ?? '')]));
+const TITULAR_VACIO = {
+  titular_tipo_documento: 'NIF', titular_dni: '', titular_nombres: '', titular_apellidos: '', titular_nacionalidad: '',
+  titular_fecha_nacimiento: '', titular_edad: '', titular_telefono_fijo: '',
+  titular_telefono_movil: '', titular_correo: '', titular_banco: '', titular_iban: ''
+};
 const estadosVenta = ['PDT FIRMA','FIRMADO','CANCELADO','BAJA RECUPERADA','BAJA NO RECUPERADA','ACTIVADO','BAJA','VERI KO','VOLTEADA'];
 
 export default function Ventas() {
@@ -13,19 +27,18 @@ export default function Ventas() {
 
   const [campanas, setCampanas] = useState([]);
   const [tarifas, setTarifas] = useState([]);
-  const [busqueda, setBusqueda] = useState('');
   const [titular, setTitular] = useState(null);
   const [buscando, setBuscando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg] = useState('');
   const [archivos, setArchivos] = useState([]);
   const [dragging, setDragging] = useState(false);
+  const [bancoAuto, setBancoAuto] = useState(false);
+  const [recienRegistrado, setRecienRegistrado] = useState(false);
+  const [letraAuto, setLetraAuto] = useState(false);
+  const [edicion, setEdicion] = useState(camposDe(null));
 
-  const [nuevoTitular, setNuevoTitular] = useState({
-    titular_dni: '', titular_nombres: '', titular_apellidos: '', titular_nacionalidad: '',
-    titular_fecha_nacimiento: '', titular_edad: '', titular_telefono_fijo: '',
-    titular_telefono_movil: '', titular_correo: '', titular_banco: '', titular_iban: ''
-  });
+  const [nuevoTitular, setNuevoTitular] = useState(TITULAR_VACIO);
 
   const [form, setForm] = useState({
     venta_fecha: '', venta_campana_id: '', venta_tarifa_id: '',
@@ -38,29 +51,87 @@ export default function Ventas() {
     axios.get('http://localhost:3000/api/catalogo/tarifas', { headers }).then(res => setTarifas(res.data));
   }, []);
 
-  const buscarTitular = async () => {
-    if (!busqueda) return;
+  // Al escribir el número de identidad se busca solo; si ya existe, se cargan sus datos
+  const documentoNormalizado = normalizarDocumento(nuevoTitular.titular_dni);
+
+  useEffect(() => {
+    setRecienRegistrado(false);
+    if (documentoNormalizado.length < 5) { setTitular(null); setBuscando(false); return; }
+    let cancelado = false;
     setBuscando(true);
-    try {
-      const esId = /^\d+$/.test(busqueda) && busqueda.length <= 5;
-      const url = esId
-        ? `http://localhost:3000/api/titulares/id/${busqueda}`
-        : `http://localhost:3000/api/titulares/dni/${busqueda}`;
-      const res = await axios.get(url, { headers });
-      setTitular(res.data);
-      setMsg('');
-    } catch {
-      setTitular(null);
-      setMsg('Titular no encontrado. Complete los datos para registrarlo.');
-    } finally { setBuscando(false); }
+    const espera = setTimeout(() => {
+      axios.get(`http://localhost:3000/api/titulares/dni/${encodeURIComponent(documentoNormalizado)}`, { headers })
+        .then(res => {
+          if (cancelado) return;
+          setTitular(res.data);
+          setEdicion(camposDe(res.data));
+          setBancoAuto(false);
+          if (res.data.titular_tipo_documento) {
+            setNuevoTitular(prev => ({ ...prev, titular_tipo_documento: res.data.titular_tipo_documento }));
+          }
+        })
+        .catch(() => { if (!cancelado) setTitular(null); })
+        .finally(() => { if (!cancelado) setBuscando(false); });
+    }, 400);
+    return () => { cancelado = true; clearTimeout(espera); };
+  }, [documentoNormalizado]);
+
+  // Al completar el número (8 dígitos del NIF o X/Y/Z + 7 del NIE) se agrega la letra de control.
+  // Solo cuando se escribe hacia adelante: si el asesor borra, no se vuelve a agregar.
+  const cambiarDocumento = (valor) => {
+    const nuevo = normalizarDocumento(valor);
+    const anterior = normalizarDocumento(nuevoTitular.titular_dni);
+    const completado = nuevo.length > anterior.length
+      ? completarLetraControl(nuevoTitular.titular_tipo_documento, nuevo)
+      : nuevo;
+    setLetraAuto(completado !== nuevo);
+    setNuevoTitular({ ...nuevoTitular, titular_dni: completado });
+  };
+
+  // Los campos se editan sobre los datos del titular existente o sobre el formulario del nuevo
+  const formActual = titular ? edicion : nuevoTitular;
+  const setFormActual = titular ? setEdicion : setNuevoTitular;
+
+  // Al escribir el IBAN se completa el banco; si el asesor edita el banco a mano, ya no se pisa
+  const cambiarCampoTitular = (key, valor) => {
+    if (key === 'titular_iban') {
+      const detectado = bancoDesdeIban(valor);
+      const sobrescribir = bancoAuto || !formActual.titular_banco;
+      setFormActual({ ...formActual, titular_iban: valor, ...(sobrescribir ? { titular_banco: detectado } : {}) });
+      if (sobrescribir) setBancoAuto(detectado !== '');
+      return;
+    }
+    if (key === 'titular_banco') setBancoAuto(false);
+    setFormActual({ ...formActual, [key]: valor });
+  };
+
+  // ¿El asesor modificó algo de un titular que ya existe?
+  const base = camposDe(titular);
+  const hayCambios = !!titular && (
+    CAMPOS_TITULAR.some(k => edicion[k] !== base[k]) ||
+    (!!titular.titular_tipo_documento && nuevoTitular.titular_tipo_documento !== titular.titular_tipo_documento)
+  );
+
+  const guardarCambiosTitular = async () => {
+    const tipo = nuevoTitular.titular_tipo_documento;
+    await axios.put(`http://localhost:3000/api/titulares/${titular.titular_id}`, { titular_tipo_documento: tipo, ...edicion }, { headers });
+    setTitular({ ...titular, ...edicion, titular_tipo_documento: tipo });
+  };
+
+  const handleActualizarTitular = async () => {
+    try { await guardarCambiosTitular(); setMsg('✅ Datos del titular actualizados'); }
+    catch (err) { setMsg(`❌ ${err.response?.data?.mensaje || 'No se pudieron actualizar los datos del titular'}`); }
   };
 
   const registrarTitular = async () => {
+    if (!documentoNormalizado) return setMsg('❌ Escribe el número de identidad del titular');
     try {
-      const res = await axios.post('http://localhost:3000/api/titulares', nuevoTitular, { headers });
-      setTitular({ ...nuevoTitular, titular_id: res.data.id });
+      const res = await axios.post('http://localhost:3000/api/titulares', { ...nuevoTitular, titular_dni: documentoNormalizado }, { headers });
+      setTitular({ ...nuevoTitular, titular_dni: documentoNormalizado, titular_id: res.data.id });
+      setRecienRegistrado(true);
+      setEdicion(camposDe(nuevoTitular));
       setMsg('✅ Titular registrado correctamente');
-    } catch { setMsg('❌ Error al registrar titular'); }
+    } catch (err) { setMsg(`❌ ${err.response?.data?.mensaje || 'Error al registrar titular'}`); }
   };
 
   const agregarArchivos = (lista) => {
@@ -81,6 +152,13 @@ export default function Ventas() {
   const handleGuardar = async () => {
     if (!titular) return setMsg('❌ Primero busca o registra un titular');
     setGuardando(true); setMsg('');
+    if (hayCambios) {
+      try { await guardarCambiosTitular(); }
+      catch (err) {
+        setGuardando(false);
+        return setMsg(`❌ No se pudieron guardar los cambios del titular: ${err.response?.data?.mensaje || 'sin conexión con el servidor'}`);
+      }
+    }
     try {
       // Venta y archivos viajan en una sola petición: si algo falla, no se guarda nada
       const formData = new FormData();
@@ -93,10 +171,8 @@ export default function Ventas() {
         headers: { ...headers, 'Content-Type': 'multipart/form-data' }
       });
 
-      setMsg(archivos.length > 0
-        ? `✅ Venta guardada correctamente con ${archivos.length} archivo(s)`
-        : '✅ Venta guardada correctamente');
-      setTitular(null); setBusqueda(''); setArchivos([]);
+      setMsg('✅ Venta enviada. Quedó pendiente de revisión del Back' + (archivos.length > 0 ? ` con ${archivos.length} archivo(s)` : ''));
+      setTitular(null); setNuevoTitular(TITULAR_VACIO); setBancoAuto(false); setArchivos([]);
       setForm({ venta_fecha: '', venta_campana_id: '', venta_tarifa_id: '', venta_metodo_confirmacion: 'LLAMADA', venta_codigo_sms: '', venta_estado: 'PDT FIRMA', venta_observacion: '' });
     } catch (err) {
       setMsg(`❌ No se guardó la venta: ${err.response?.data?.mensaje || 'no hay conexión con el servidor'}. Revisa los datos y vuelve a intentarlo.`);
@@ -112,50 +188,91 @@ export default function Ventas() {
       {/* Datos del Titular */}
       <div className="bg-white rounded-xl shadow p-5 mb-5">
         <h3 className="font-semibold text-gray-700 mb-3">Datos del Titular</h3>
-        <div className="flex gap-3 mb-4">
-          <input className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1"
-            placeholder="DNI o ID del titular"
-            value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-          <button onClick={buscarTitular} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
-            {buscando ? 'Buscando...' : 'Buscar'}
-          </button>
+
+        <div className="grid grid-cols-3 gap-3 mb-2">
+          <div>
+            <label className="text-xs text-gray-500">Tipo de documento</label>
+            <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              value={nuevoTitular.titular_tipo_documento}
+              onChange={(e) => { setLetraAuto(false); setNuevoTitular({ ...nuevoTitular, titular_tipo_documento: e.target.value }); }}>
+              {TIPOS_DOCUMENTO.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div className="col-span-2">
+            <label className="text-xs text-gray-500">Número de identidad</label>
+            <input className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" maxLength={20}
+              placeholder={nuevoTitular.titular_tipo_documento === 'PASAPORTE' ? 'Número de pasaporte' : 'Ej: 12345678Z'}
+              value={nuevoTitular.titular_dni}
+              onChange={(e) => cambiarDocumento(e.target.value)} />
+          </div>
         </div>
 
-        {titular ? (
-          <div className="grid grid-cols-2 gap-3 text-sm text-gray-600 bg-green-50 p-4 rounded-lg">
-            <p><span className="font-medium">ID:</span> {titular.titular_id}</p>
-            <p><span className="font-medium">DNI:</span> {titular.titular_dni}</p>
-            <p><span className="font-medium">Nombre:</span> {titular.titular_nombres} {titular.titular_apellidos}</p>
-            <p><span className="font-medium">Móvil:</span> {titular.titular_telefono_movil}</p>
-            <p><span className="font-medium">Email:</span> {titular.titular_correo}</p>
-            <p><span className="font-medium">Banco:</span> {titular.titular_banco}</p>
-            <p><span className="font-medium">IBAN:</span> {titular.titular_iban}</p>
-            <p><span className="font-medium">Nacionalidad:</span> {titular.titular_nacionalidad}</p>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                ['titular_dni','DNI/NIE'],['titular_nombres','Nombres'],['titular_apellidos','Apellidos'],
-                ['titular_nacionalidad','Nacionalidad'],['titular_telefono_fijo','Teléfono Fijo'],
-                ['titular_telefono_movil','Teléfono Móvil'],['titular_correo','Correo'],
-                ['titular_banco','Banco'],['titular_iban','IBAN'],
-                ['titular_fecha_nacimiento','Fecha Nacimiento'],['titular_edad','Edad']
-              ].map(([key, label]) => (
-                <div key={key}>
-                  <label className="text-xs text-gray-500">{label}</label>
-                  <input className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                    type={key === 'titular_fecha_nacimiento' ? 'date' : 'text'}
-                    value={nuevoTitular[key]}
-                    onChange={(e) => setNuevoTitular({ ...nuevoTitular, [key]: e.target.value })} />
-                </div>
-              ))}
-            </div>
-            <button onClick={registrarTitular}
-              className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition">
-              Registrar Titular
+        <div className="mb-4 min-h-5 text-xs">
+          {buscando ? (
+            <p className="text-gray-400">Buscando titular...</p>
+          ) : titular ? (
+            <p className="text-green-700 bg-green-50 rounded-lg px-3 py-2">
+              {recienRegistrado
+                ? `✓ Titular registrado (ID ${titular.titular_id}).`
+                : `✓ Titular existente (ID ${titular.titular_id}): se cargaron sus datos. Puedes editarlos.`}
+            </p>
+          ) : documentoNormalizado.length >= 5 ? (
+            <p className="text-gray-500">Titular nuevo: completa los datos y regístralo.</p>
+          ) : null}
+          {letraAuto && (
+            <p className="text-green-600 mt-1">Letra de control agregada automáticamente</p>
+          )}
+          {documentoValido(nuevoTitular.titular_tipo_documento, nuevoTitular.titular_dni) === false && (
+            <p className="text-red-600 mt-1">⚠ {nuevoTitular.titular_tipo_documento} no válido, revísalo</p>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            ['titular_nombres','Nombres'],['titular_apellidos','Apellidos'],
+            ['titular_nacionalidad','Nacionalidad'],['titular_telefono_fijo','Teléfono Fijo'],
+            ['titular_telefono_movil','Teléfono Móvil'],
+            ['titular_iban','IBAN'],['titular_banco','Banco'],
+            ['titular_correo','Correo'],
+            ['titular_fecha_nacimiento','Fecha Nacimiento'],['titular_edad','Edad']
+          ].map(([key, label]) => {
+            const valor = formActual[key] ?? '';
+            return (
+              <div key={key}>
+                <label className="text-xs text-gray-500">{label}</label>
+                <input className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  type={key === 'titular_fecha_nacimiento' ? 'date' : 'text'}
+                  value={key === 'titular_fecha_nacimiento' ? String(valor).slice(0, 10) : valor}
+                  onChange={(e) => cambiarCampoTitular(key, e.target.value)} />
+                {key === 'titular_banco' && bancoAuto && (
+                  <p className="text-xs text-green-600 mt-1">Detectado por el IBAN</p>
+                )}
+                {key === 'titular_iban' && ibanEspanolValido(formActual.titular_iban) === true && (
+                  <p className="text-xs text-green-600 mt-1">✓ IBAN válido</p>
+                )}
+                {key === 'titular_iban' && ibanEspanolValido(formActual.titular_iban) === false && (
+                  <p className="text-xs text-red-600 mt-1">⚠ IBAN no válido, revísalo</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {hayCambios && (
+          <div className="mt-4 flex items-center gap-3">
+            <button onClick={handleActualizarTitular}
+              className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition">
+              Guardar cambios del titular
             </button>
-          </>
+            <p className="text-xs text-amber-600">Modificaste datos del titular. También se guardarán al enviar la venta.</p>
+          </div>
+        )}
+
+        {!titular && (
+          <button onClick={registrarTitular}
+            className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition">
+            Registrar Titular
+          </button>
         )}
       </div>
 

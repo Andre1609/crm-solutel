@@ -5,7 +5,7 @@ require('dotenv').config();
 
 const login = (req, res) => {
   const { email, password } = req.body;
-  const sql = `SELECT p.*, r.rol_nombre, e.equipo_id as equipo_id_personal
+  const sql = `SELECT p.*, r.rol_nombre, e.equipo_id as equipo_id_personal, e.equipo_nombre
     FROM personal p
     JOIN roles r ON p.personal_rol_id = r.rol_id
     LEFT JOIN equipos e ON p.personal_equipo_id = e.equipo_id
@@ -22,7 +22,8 @@ const login = (req, res) => {
         nombre: usuario.personal_nombres,
         rol_id: usuario.personal_rol_id,
         rol_nombre: usuario.rol_nombre,
-        equipo_id: usuario.equipo_id_personal
+        equipo_id: usuario.equipo_id_personal,
+        equipo_nombre: usuario.equipo_nombre
       },
       process.env.JWT_SECRET,
       { expiresIn: '8h' }
@@ -34,7 +35,8 @@ const login = (req, res) => {
         nombre: usuario.personal_nombres,
         rol_id: usuario.personal_rol_id,
         rol_nombre: usuario.rol_nombre,
-        equipo_id: usuario.equipo_id_personal
+        equipo_id: usuario.equipo_id_personal,
+        equipo_nombre: usuario.equipo_nombre
       }
     });
   });

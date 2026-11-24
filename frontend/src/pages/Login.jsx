@@ -11,7 +11,7 @@ export default function Login() {
   const navigate = useNavigate();
   const handleSubmit = async (e) => {
     e.preventDefault(); setLoading(true); setError('');
-    try { const res = await axios.post('http://localhost:3000/api/auth/login', { email, password }); login(res.data); navigate('/ventas'); }
+    try { const res = await axios.post('http://localhost:3000/api/auth/login', { email, password }); login(res.data); navigate('/'); }
     catch (err) { setError(err.response?.data?.mensaje || 'Error al iniciar sesión'); }
     finally { setLoading(false); }
   };

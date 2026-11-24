@@ -17,6 +17,7 @@ const estadoColores = {
   'VOLTEADA': 'bg-pink-100 text-pink-700',
 };
 
+const fmtDia = (d) => d ? new Date(`${d}T00:00:00`).toLocaleDateString() : '-';
 const estadosVenta = ['PDT FIRMA','FIRMADO','CANCELADO','BAJA RECUPERADA','BAJA NO RECUPERADA','ACTIVADO','BAJA','VERI KO','VOLTEADA'];
 const POR_PAGINA = 13;
 
@@ -77,6 +78,8 @@ export default function Historial() {
       'Asesor': v.asesor,
       'Equipo': v.equipo || '-',
       'Fecha': new Date(v.venta_creado_en).toLocaleDateString(),
+      'F. Activación': fmtDia(v.fecha_activacion),
+      'F. Baja': fmtDia(v.fecha_baja),
       'Observación': v.venta_observacion || '-',
     }));
     const ws = XLSX.utils.json_to_sheet(datos);
@@ -89,6 +92,8 @@ export default function Historial() {
       { wch: 20 }, 
       { wch: 15 }, 
       { wch: 12 }, 
+      { wch: 14 }, 
+      { wch: 14 }, 
       { wch: 210 }, 
 
     ];
@@ -172,7 +177,7 @@ export default function Historial() {
 
       <p className="text-xs text-gray-500 mb-3">{filtradas.length} resultado(s)</p>
 
-      <div className="bg-white rounded-xl shadow overflow-hidden">
+      <div className="bg-white rounded-xl shadow overflow-x-auto">
         <table className="w-full text-sm table-fixed">
           <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
             <tr>
@@ -184,16 +189,18 @@ export default function Historial() {
               <th className="px-4 py-3 text-left w-32">Asesor</th>
               <th className="px-4 py-3 text-left w-28">Equipo</th>
               <th className="px-4 py-3 text-left w-24">Fecha</th>
+              <th className="px-4 py-3 text-left w-28">F. Activación</th>
+              <th className="px-4 py-3 text-left w-28">F. Baja</th>
             </tr>
           </thead>
           <tbody>
             {cargando ? (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Cargando...</td></tr>
+              <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">Cargando...</td></tr>
             ) : filtradas.length === 0 ? (
               <>
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">No hay ventas registradas</td></tr>
+                <tr><td colSpan={10} className="px-4 py-8 text-center text-gray-400">No hay ventas registradas</td></tr>
                 {Array.from({ length: POR_PAGINA - 1 }).map((_, i) => (
-                  <tr key={`empty-${i}`} className="border-t border-gray-50"><td colSpan={8} className="h-10" /></tr>
+                  <tr key={`empty-${i}`} className="border-t border-gray-50"><td colSpan={10} className="h-10" /></tr>
                 ))}
               </>
             ) : (
@@ -212,10 +219,12 @@ export default function Historial() {
                     <td className="px-4 py-2 text-gray-500 truncate">{v.asesor}</td>
                     <td className="px-4 py-2 text-gray-500 truncate">{v.equipo || '-'}</td>
                     <td className="px-4 py-2 text-gray-500">{new Date(v.venta_creado_en).toLocaleDateString()}</td>
+                    <td className="px-4 py-2 text-gray-500">{fmtDia(v.fecha_activacion)}</td>
+                    <td className="px-4 py-2 text-gray-500">{fmtDia(v.fecha_baja)}</td>
                   </tr>
                 ))}
                 {Array.from({ length: filasVacias }).map((_, i) => (
-                  <tr key={`pad-${i}`} className="border-t border-gray-50 h-10"><td colSpan={8} /></tr>
+                  <tr key={`pad-${i}`} className="border-t border-gray-50 h-10"><td colSpan={10} /></tr>
                 ))}
               </>
             )}
@@ -261,7 +270,9 @@ export default function Historial() {
                 <div className="space-y-2 text-sm">
                   {[['Titular', seleccionada.titular],['DNI', seleccionada.titular_dni],['Campaña', seleccionada.campana||'-'],
                     ['Tarifa', seleccionada.tarifa||'-'],['Asesor', seleccionada.asesor],['Equipo', seleccionada.equipo||'-'],
-                    ['Fecha', new Date(seleccionada.venta_creado_en).toLocaleDateString()]
+                    ['Fecha', new Date(seleccionada.venta_creado_en).toLocaleDateString()],
+                    ...(seleccionada.fecha_activacion ? [['Fecha de activación', fmtDia(seleccionada.fecha_activacion)]] : []),
+                    ...(seleccionada.fecha_baja ? [['Fecha de baja', fmtDia(seleccionada.fecha_baja)]] : [])
                   ].map(([label, valor]) => (
                     <div key={label} className="flex justify-between border-b pb-1.5">
                       <span className="text-gray-500">{label}</span>
@@ -279,10 +290,12 @@ export default function Historial() {
                     </div>
                   )}
                 </div>
+                {usuario?.rol_id === 1 && (
                 <div className="flex gap-3 mt-5">
                   <button onClick={() => setEditando(true)} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium">Editar venta</button>
                   <button onClick={() => setConfirmEliminar(true)} className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg text-sm font-medium">Eliminar venta</button>
                 </div>
+                )}
               </>
             )}
             {editando && (

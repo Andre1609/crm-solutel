@@ -1,9 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const { obtenerCampanas, obtenerTarifas, obtenerRoles, obtenerEquipos } = require('../controllers/catalogoController');
+const { obtenerCampanas, obtenerTarifas, obtenerRoles, obtenerEquipos, obtenerCampanasAdmin, crearCampana, editarCampana, obtenerTarifasAdmin, crearTarifa, editarTarifa } = require('../controllers/catalogoController');
 const { verificarToken } = require('../middleware/auth');
 router.get('/campanas', verificarToken, obtenerCampanas);
+router.get('/campanas/admin', verificarToken, obtenerCampanasAdmin);
+router.post('/campanas', verificarToken, crearCampana);
+router.put('/campanas/:id', verificarToken, editarCampana);
 router.get('/tarifas', verificarToken, obtenerTarifas);
+router.get('/tarifas/admin', verificarToken, obtenerTarifasAdmin);
+router.post('/tarifas', verificarToken, crearTarifa);
+router.put('/tarifas/:id', verificarToken, editarTarifa);
 router.get('/roles', verificarToken, obtenerRoles);
 router.get('/equipos', verificarToken, obtenerEquipos);
 module.exports = router;

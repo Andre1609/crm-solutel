@@ -15,6 +15,7 @@ const estadoColores = {
   'VOLTEADA': 'bg-pink-100 text-pink-700 border-pink-200',
 };
 
+const fmtDia = (d) => d ? new Date(`${d}T00:00:00`).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
 const POR_PAGINA = 10;
 const CADA_MS = 30000; // revisa comentarios nuevos cada 30 segundos
 
@@ -106,15 +107,17 @@ export default function MisVentas() {
                 <th className="px-4 py-3 text-left">Campaña</th>
                 <th className="px-4 py-3 text-left">Tarifa</th>
                 <th className="px-4 py-3 text-left">Fecha</th>
+                <th className="px-4 py-3 text-left">F. Activación</th>
+                <th className="px-4 py-3 text-left">F. Baja</th>
                 <th className="px-4 py-3 text-left">Estado</th>
                 <th className="px-4 py-3 text-left">Acción</th>
               </tr>
             </thead>
             <tbody>
               {cargando ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Cargando...</td></tr>
+                <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">Cargando...</td></tr>
               ) : paginadas.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">No hay ventas para mostrar</td></tr>
+                <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">No hay ventas para mostrar</td></tr>
               ) : paginadas.map(v => (
                 <tr key={v.venta_id} className="border-t border-gray-100 hover:bg-gray-50">
                   <td className="px-4 py-3">
@@ -125,10 +128,18 @@ export default function MisVentas() {
                   <td className="px-4 py-3 text-gray-600 text-xs">{v.campana || '-'}</td>
                   <td className="px-4 py-3 text-gray-600 text-xs">{v.tarifa || '-'}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{fmtFecha(v.venta_creado_en)}</td>
+                  <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{fmtDia(v.fecha_activacion)}</td>
+                  <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{fmtDia(v.fecha_baja)}</td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ${estadoColores[v.venta_estado] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                      {v.venta_estado}
-                    </span>
+                    {v.venta_revision === 'PENDIENTE' ? (
+                      <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap bg-yellow-50 text-yellow-700 border-yellow-200">⏳ En revisión</span>
+                    ) : v.venta_revision === 'CANCELADA' ? (
+                      <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap bg-red-50 text-red-700 border-red-200">✕ Carga cancelada</span>
+                    ) : (
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ${estadoColores[v.venta_estado] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                        {v.venta_estado}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <button onClick={() => abrirComentarios(v)}

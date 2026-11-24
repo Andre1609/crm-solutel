@@ -7,12 +7,6 @@ export default function Archivos() {
   const { token } = useAuth();
   const headers = { Authorization: `Bearer ${token}` };
   const [documentos, setDocumentos] = useState([]);
-  const [archivo, setArchivo] = useState(null);
-  const [tipo, setTipo] = useState('OTRO');
-  const [ventaId, setVentaId] = useState('');
-  const [titularId, setTitularId] = useState('');
-  const [dragging, setDragging] = useState(false);
-  const [subiendo, setSubiendo] = useState(false);
   const [msg, setMsg] = useState('');
   const [confirmEliminar, setConfirmEliminar] = useState(null);
 
@@ -21,32 +15,6 @@ export default function Archivos() {
   };
 
   useEffect(() => { cargarDocumentos(); }, []);
-
-  const handleDrop = (e) => {
-    e.preventDefault(); setDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) setArchivo(file);
-  };
-
-  const handleSeleccionar = (e) => { if (e.target.files[0]) setArchivo(e.target.files[0]); };
-
-  const handleSubir = async () => {
-    if (!archivo) return setMsg('❌ Selecciona un archivo primero');
-    setSubiendo(true); setMsg('');
-    try {
-      const formData = new FormData();
-      formData.append('archivo', archivo);
-      formData.append('documento_tipo', tipo);
-      if (ventaId) formData.append('documento_venta_id', ventaId);
-      if (titularId) formData.append('documento_titular_id', titularId);
-      await axios.post('http://localhost:3000/api/documentos', formData, {
-        headers: { ...headers, 'Content-Type': 'multipart/form-data' }
-      });
-      setMsg('✅ Archivo subido correctamente');
-      setArchivo(null); cargarDocumentos();
-    } catch { setMsg('❌ Error al subir el archivo'); }
-    finally { setSubiendo(false); }
-  };
 
   const handleEliminar = async () => {
     try {
@@ -58,62 +26,17 @@ export default function Archivos() {
   };
 
   const handleAbrir = (ruta) => {
-    const url = `http://localhost:3000/${ruta.replace(/\\/g, '/')}`;
+    const url = `http://localhost:3000/${ruta.replace(/\\/g, '/').split('/').map(encodeURIComponent).join('/')}`;
     window.open(url, '_blank');
   };
 
   return (
     <Layout>
-      <h2 className="text-xl font-bold text-gray-800 mb-6">Documentación Asociada</h2>
+      <h2 className="text-xl font-bold text-gray-800 mb-2">Documentación Asociada</h2>
 
-      <div className="bg-white rounded-xl shadow p-5 mb-6">
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Tipo de documento</label>
-            <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              value={tipo} onChange={(e) => setTipo(e.target.value)}>
-              {['GRABACION','DNI','CONTRATO','FACTURA','OTRO'].map(t => <option key={t}>{t}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">ID Venta (opcional)</label>
-            <input className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              placeholder="Ej: 1" value={ventaId} onChange={(e) => setVentaId(e.target.value)} />
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">ID Titular (opcional)</label>
-            <input className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-              placeholder="Ej: 1" value={titularId} onChange={(e) => setTitularId(e.target.value)} />
-          </div>
-        </div>
+      <p className="text-sm text-gray-500 mb-4">Los archivos de los clientes los sube el Back desde Auditoría o Cargas.</p>
 
-        <div onDrop={handleDrop}
-          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-          onDragLeave={() => setDragging(false)}
-          className={`border-2 border-dashed rounded-xl p-12 text-center transition ${dragging ? 'border-green-400 bg-green-50' : 'border-gray-300 bg-gray-50'}`}>
-          {archivo ? (
-            <div>
-              <p className="text-green-600 font-medium text-sm">{archivo.name}</p>
-              <p className="text-gray-400 text-xs mt-1">{(archivo.size / 1024).toFixed(1)} KB</p>
-            </div>
-          ) : (
-            <p className="text-gray-400 text-sm">Arrastra un archivo aquí</p>
-          )}
-        </div>
-
-        {msg && <p className="text-sm mt-3">{msg}</p>}
-
-        <div className="flex gap-3 mt-4">
-          <label className="bg-gray-700 text-white px-4 py-2 rounded-lg text-sm cursor-pointer hover:bg-gray-800">
-            Seleccionar archivo
-            <input type="file" className="hidden" onChange={handleSeleccionar} />
-          </label>
-          <button onClick={handleSubir} disabled={subiendo}
-            className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700">
-            {subiendo ? 'Subiendo...' : 'Subir archivo'}
-          </button>
-        </div>
-      </div>
+      {msg && <p className="text-sm mb-3">{msg}</p>}
 
       <div className="bg-white rounded-xl shadow overflow-hidden">
         <table className="w-full text-sm">

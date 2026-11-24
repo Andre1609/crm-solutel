@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import Layout from '../components/Layout';
 
 const rolColores = {
   'Jefe de Plataforma': 'bg-red-100 text-red-700',
@@ -106,9 +105,7 @@ export default function Usuarios() {
   };
 
   return (
-    <Layout>
-      <h2 className="text-xl font-bold text-gray-800 mb-6">Gestión de Personal</h2>
-
+    <>
       <div className="bg-white rounded-xl shadow p-5 mb-6">
         <h3 className="font-semibold text-gray-700 mb-3">Nuevo Personal</h3>
         {msg && <p className="text-sm mb-3">{msg}</p>}
@@ -121,7 +118,7 @@ export default function Usuarios() {
             <label className="text-xs text-gray-500">Rol</label>
             <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value={form.personal_rol_id} onChange={(e) => setForm({ ...form, personal_rol_id: e.target.value })}>
               <option value="">Seleccionar rol</option>
-              {roles.map(r => <option key={r.rol_id} value={r.rol_id}>{r.rol_nombre}</option>)}
+              {roles.filter(r => r.rol_id !== 1).map(r => <option key={r.rol_id} value={r.rol_id}>{r.rol_nombre}</option>)}
             </select>
           </div>
           <div>
@@ -270,7 +267,9 @@ export default function Usuarios() {
                 </div>
                 <div className="flex gap-3 mt-6">
                   <button onClick={() => setEditando(true)} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium">Editar datos</button>
-                  <button onClick={() => setConfirmEliminar(true)} className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg text-sm font-medium">Eliminar personal</button>
+                  {seleccionado.personal_rol_id !== 1 && (
+                    <button onClick={() => setConfirmEliminar(true)} className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg text-sm font-medium">Eliminar personal</button>
+                  )}
                 </div>
               </>
             )}
@@ -289,10 +288,13 @@ export default function Usuarios() {
                   ))}
                   <div>
                     <label className="text-xs text-gray-500">Rol</label>
-                    <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm disabled:bg-gray-100"
                       value={formEditar.personal_rol_id || ''}
+                      disabled={Number(formEditar.personal_rol_id) === 1}
                       onChange={(e) => setFormEditar({ ...formEditar, personal_rol_id: e.target.value })}>
-                      {roles.map(r => <option key={r.rol_id} value={r.rol_id}>{r.rol_nombre}</option>)}
+                      {roles
+                        .filter(r => Number(formEditar.personal_rol_id) === 1 ? r.rol_id === 1 : r.rol_id !== 1)
+                        .map(r => <option key={r.rol_id} value={r.rol_id}>{r.rol_nombre}</option>)}
                     </select>
                   </div>
                   <div>
@@ -328,6 +330,6 @@ export default function Usuarios() {
           </div>
         </div>
       )}
-    </Layout>
+    </>
   );
 }

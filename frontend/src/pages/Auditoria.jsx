@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
+import ArchivosVenta from '../components/ArchivosVenta';
 import { useNavigate } from 'react-router-dom';
 
 const estadoColores = {
@@ -22,6 +23,7 @@ const estadoDot = {
   'BAJA NO RECUPERADA': 'bg-orange-500', 'VERI KO': 'bg-purple-500', 'VOLTEADA': 'bg-pink-500',
 };
 
+const fmtDia = (d) => d ? new Date(`${d}T00:00:00`).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
 const estadosVenta = ['PDT FIRMA','FIRMADO','CANCELADO','BAJA RECUPERADA','BAJA NO RECUPERADA','ACTIVADO','BAJA','VERI KO','VOLTEADA'];
 const tabs = ['Todas', ...estadosVenta];
 const POR_PAGINA = 13;
@@ -91,11 +93,11 @@ export default function Auditoria() {
     finally { setEnviando(false); }
   };
 
-  const handleGuardarEstado = async () => {
+  const guardarEstado = async (estado) => {
     setGuardando(true);
     try {
       await axios.put(`http://localhost:3000/api/ventas/${seleccionada.venta_id}`, {
-        venta_estado: nuevoEstado,
+        venta_estado: estado,
         venta_campana_id: seleccionada.venta_campana_id,
         venta_tarifa_id: seleccionada.venta_tarifa_id,
         venta_observacion: seleccionada.venta_observacion,
@@ -105,6 +107,13 @@ export default function Auditoria() {
       setSeleccionada(null);
     } catch { alert('Error al guardar'); }
     finally { setGuardando(false); }
+  };
+
+  const handleGuardarEstado = () => guardarEstado(nuevoEstado);
+
+  const handleDarDeBaja = () => {
+    if (!window.confirm('¿Dar de baja esta venta? Se registrará la fecha de hoy como fecha de baja.')) return;
+    guardarEstado('BAJA');
   };
 
   const filtradas = ventas.filter(v => {
@@ -217,7 +226,7 @@ export default function Auditoria() {
         ))}
       </div>
 
-      <div className="bg-white rounded-xl shadow overflow-hidden">
+      <div className="bg-white rounded-xl shadow overflow-x-auto">
         <div className="flex gap-1 p-3 border-b bg-gray-50 overflow-x-auto">
           {tabs.map(tab => {
             const count = tab === 'Todas' ? ventas.length : contarPorEstado(tab);
@@ -254,18 +263,20 @@ export default function Auditoria() {
               <th className="px-4 py-3 text-left w-36">Tarifa</th>
               <th className="px-4 py-3 text-left w-32">Agente</th>
               <th className="px-4 py-3 text-left w-24">Fecha</th>
+              <th className="px-4 py-3 text-left w-28">F. Activación</th>
+              <th className="px-4 py-3 text-left w-28">F. Baja</th>
               <th className="px-4 py-3 text-left w-36">Estado</th>
               <th className="px-4 py-3 text-left w-24">Acción</th>
             </tr>
           </thead>
           <tbody>
             {cargando ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Cargando...</td></tr>
+              <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">Cargando...</td></tr>
             ) : filtradas.length === 0 ? (
               <>
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">No hay ventas</td></tr>
+                <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400">No hay ventas</td></tr>
                 {Array.from({ length: POR_PAGINA - 1 }).map((_, i) => (
-                  <tr key={`e-${i}`} className="border-t border-gray-50"><td colSpan={7} className="h-10" /></tr>
+                  <tr key={`e-${i}`} className="border-t border-gray-50"><td colSpan={9} className="h-10" /></tr>
                 ))}
               </>
             ) : (
@@ -290,6 +301,8 @@ export default function Auditoria() {
                       <td className="px-4 py-2 text-gray-500 text-xs">
                         {new Date(v.venta_creado_en).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </td>
+                      <td className="px-4 py-2 text-gray-500 text-xs">{fmtDia(v.fecha_activacion)}</td>
+                      <td className="px-4 py-2 text-gray-500 text-xs">{fmtDia(v.fecha_baja)}</td>
                       <td className="px-4 py-2">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ${estadoColores[v.venta_estado] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
                           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${estadoDot[v.venta_estado] || 'bg-gray-400'}`} />
@@ -306,7 +319,7 @@ export default function Auditoria() {
                   );
                 })}
                 {Array.from({ length: filasVacias }).map((_, i) => (
-                  <tr key={`pad-${i}`} className="border-t border-gray-50 h-10"><td colSpan={7} /></tr>
+                  <tr key={`pad-${i}`} className="border-t border-gray-50 h-10"><td colSpan={9} /></tr>
                 ))}
               </>
             )}
@@ -369,7 +382,9 @@ export default function Auditoria() {
                     </div>
                     <p className="font-bold text-gray-800">{seleccionada.titular}</p>
                   </div>
-                  {[['DNI', seleccionada.titular_dni],['Agente comercial', seleccionada.asesor],['Campaña', seleccionada.campana||'-'],['Tarifa', seleccionada.tarifa||'-'],['Equipo', seleccionada.equipo||'-']].map(([label, valor]) => (
+                  {[['DNI', seleccionada.titular_dni],['Agente comercial', seleccionada.asesor],['Campaña', seleccionada.campana||'-'],['Tarifa', seleccionada.tarifa||'-'],['Equipo', seleccionada.equipo||'-'],
+                    ...(seleccionada.fecha_activacion ? [['Fecha de activación', fmtDia(seleccionada.fecha_activacion)]] : []),
+                    ...(seleccionada.fecha_baja ? [['Fecha de baja', fmtDia(seleccionada.fecha_baja)]] : [])].map(([label, valor]) => (
                     <div key={label} className="flex justify-between text-sm py-1.5 border-b border-gray-100 last:border-0">
                       <span className="text-gray-400">{label}</span>
                       <span className="font-medium text-gray-700">{valor}</span>
@@ -382,6 +397,11 @@ export default function Auditoria() {
               </div>
 
               <div>
+                {usuario?.rol_id === 3 && (
+                  <div className="mb-4">
+                    <ArchivosVenta ventaId={seleccionada.venta_id} />
+                  </div>
+                )}
                 <div className="mb-4">
                   <div className="flex justify-between items-center mb-1">
                     <p className="font-semibold text-gray-700 text-sm">Comentarios</p>
@@ -418,6 +438,16 @@ export default function Auditoria() {
                   <p className="text-xs text-gray-400 mt-2">Cada comentario queda registrado con fecha, hora y autor.</p>
                 </div>
 
+                {usuario?.rol_id === 3 && seleccionada.venta_estado === 'ACTIVADO' ? (
+                  <div className="bg-gray-50 rounded-xl p-4">
+                    <p className="text-sm font-semibold text-gray-700 mb-1">Venta activada</p>
+                    <p className="text-xs text-gray-500 mb-3">Activada el {fmtDia(seleccionada.fecha_activacion)}. Una venta activada solo se puede dar de baja.</p>
+                    <button onClick={handleDarDeBaja} disabled={guardando}
+                      className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-medium transition">
+                      {guardando ? 'Guardando...' : 'Dar de baja'}
+                    </button>
+                  </div>
+                ) : (
                 <div className="bg-gray-50 rounded-xl p-4">
                   <p className="text-sm font-semibold text-gray-700 mb-2">Cambiar estado de la venta</p>
                   <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3"
@@ -429,6 +459,7 @@ export default function Auditoria() {
                     {guardando ? 'Guardando...' : '✓ Guardar estado'}
                   </button>
                 </div>
+                )}
               </div>
             </div>
 
